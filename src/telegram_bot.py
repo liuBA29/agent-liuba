@@ -6,13 +6,16 @@ import sys
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
 # Добавляем путь к модулям
 sys.path.append(os.path.join(os.path.dirname(__file__)))
+
 from mcp.weather import get_weather
 from mcp.wiki import get_wiki_summary
+from mcp.github import search_github  # 🔹 добавлено обратно
 
-
-load_dotenv()  # загружает переменные из .env если он есть
+# Загружаем токены из .env
+load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 if not TELEGRAM_TOKEN:
@@ -21,6 +24,7 @@ if not TELEGRAM_TOKEN:
 # Глобальная переменная для приложения
 app = None
 
+
 def signal_handler(signum, frame):
     """Обработчик сигнала для корректной остановки бота"""
     print("\nПолучен сигнал остановки. Завершаем работу...")
@@ -28,8 +32,10 @@ def signal_handler(signum, frame):
         app.stop()
     sys.exit(0)
 
+
 # Регистрируем обработчик сигнала
 signal.signal(signal.SIGINT, signal_handler)
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
@@ -37,17 +43,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Команды:\n"
         "/help - показать это сообщение\n"
         "/health - показать статус агента\n"
-        "/weather <город> - узнать погоду в городе\n"
-        "/wiki <тема> - найти информацию в Википедии\n\n"
-        "Просто напиши что-нибудь — и я отвечу."
+        "/weather <город> - узнать погоду\n"
+        "/wiki <тема> - найти информацию в Википедии\n"
+        "/github <запрос> - поиск репозиториев на GitHub\n\n"
+        "Просто напиши что-нибудь — и я отвечу 🌸"
     )
     await update.message.reply_text(text)
 
+
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Здесь позже будем проверять интеграции; пока — базовый ответ
+    """Проверка состояния интеграций"""
     status = {
         "telegram": "ok",
-        "mcp1": "not_connected",
+        "mcp1": "connected",
         "vector_db": "not_initialized",
     }
     pretty = "\n".join(f"{k}: {v}" for k, v in status.items())
@@ -75,6 +83,15 @@ async def wiki_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(result)
 
 
+async def github_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Поиск популярных репозиториев на GitHub"""
+    if not context.args:
+        await update.message.reply_text("Напиши запрос, например: /github telegram bot")
+        return
+
+    query = " ".join(context.args)
+    result = search_github(query)
+    await update.message.reply_text(result)
 
 
 def run_bot():
@@ -85,9 +102,10 @@ def run_bot():
     app.add_handler(CommandHandler("health", health_command))
     app.add_handler(CommandHandler("weather", weather_command))
     app.add_handler(CommandHandler("wiki", wiki_command))
+    app.add_handler(CommandHandler("github", github_command))  # 🔹 добавлено обратно
 
     print("Бот запускается. Нажмите Ctrl+C для остановки.")
-    
+
     try:
         app.run_polling()
     except KeyboardInterrupt:
@@ -97,4 +115,3 @@ def run_bot():
     finally:
         if app:
             app.stop()
-

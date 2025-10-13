@@ -1,10 +1,16 @@
+import os
 import requests
 from urllib.parse import quote
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения
+load_dotenv()
 
 def get_wiki_summary(query: str) -> str:
     """
-    Получает краткое описание по запросу через новый Wikimedia API.
+    Получает краткое описание по запросу через Wikipedia API.
     Возвращает первые 2–3 предложения статьи.
+    Использует WIKI_USER_AGENT из переменных окружения.
     """
     try:
         # Правильно кодируем URL для кириллических символов
@@ -12,8 +18,11 @@ def get_wiki_summary(query: str) -> str:
         # Используем старый, но рабочий Wikipedia API:
         url = f"https://ru.wikipedia.org/api/rest_v1/page/summary/{query_encoded}"
 
+        # Получаем User-Agent из переменных окружения или используем значение по умолчанию
+        user_agent = os.getenv("WIKI_USER_AGENT", "PomoshnikLiubyBot/1.0 (https://github.com/liuBA29; contact: liuba@example.com)")
+        
         headers = {
-            "User-Agent": "PomoshnikLiubyBot/1.0 (https://github.com/liuBA29; contact: liuba@example.com)",
+            "User-Agent": user_agent,
             "Accept": "application/json"
         }
 

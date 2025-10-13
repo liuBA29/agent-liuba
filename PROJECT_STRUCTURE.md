@@ -2,7 +2,7 @@
 
 ```
 agent-liuba/
-├── .env                          # Переменные окружения (токен бота)
+├── .env                          # Переменные окружения (токен бота, user-agent для Wikipedia)
 ├── .git/                         # Git репозиторий
 ├── .idea/                        # Настройки PyCharm
 │   ├── agent-liuba.iml
@@ -23,7 +23,8 @@ agent-liuba/
 │   ├── main.py                   # Главный файл запуска
 │   ├── telegram_bot.py           # Telegram-бот с командами /help, /health, /weather
 │   └── mcp/                      # MCP (Model Context Protocol) утилиты/интеграции
-│       └── weather.py            # Получение погоды через Open-Meteo (геокодинг + текущая температура)
+│       ├── weather.py            # Получение погоды через Open-Meteo (геокодинг + текущая температура)
+│       └── wiki.py               # Поиск информации в Википедии через Wikipedia REST API
 └── PROJECT_STRUCTURE.md          # Этот файл со структурой проекта
 ```
 
@@ -31,16 +32,17 @@ agent-liuba/
 
 ### Основные файлы
 - **`main.py`** — точка входа в приложение, запускает Telegram‑бота
-- **`telegram_bot.py`** — реализация Telegram‑бота с командами `/help`, `/health`, `/weather`
+- **`telegram_bot.py`** — реализация Telegram‑бота с командами `/help`, `/health`, `/weather`, `/wiki`
 - **`mcp/weather.py`** — модуль погоды: геокодирование города и запрос текущей температуры через Open‑Meteо
-- **`.env`** — файл с переменными окружения (как минимум `TELEGRAM_TOKEN`)
+- **`mcp/wiki.py`** — модуль Википедии: поиск краткого описания статей через Wikipedia REST API
+- **`.env`** — файл с переменными окружения (`TELEGRAM_TOKEN`, `WIKI_USER_AGENT`)
 - **`requirements.txt`** — список зависимостей проекта
 - **`README.md`** — установка, настройка, запуск, команды и краткая справка
 
 ### Папки данных
 - **`conversations/`** - для сохранения истории диалогов с пользователями
 - **`data/`** - для хранения данных, векторной базы знаний, файлов
-- **`src/mcp/`** - утилиты/интеграции (содержит `weather.py`)
+- **`src/mcp/`** - утилиты/интеграции (содержит `weather.py`, `wiki.py`)
 
 ### Системные файлы
 - **`.git/`** - Git репозиторий
@@ -57,7 +59,7 @@ agent-liuba/
 ℹ️ **На будущее (пока не используется в коде):**
 - `chromadb`, `sentence-transformers` — для векторной БД и эмбеддингов
 
-✅ **Файл `.env`** — требуется переменная `TELEGRAM_TOKEN`
+✅ **Файл `.env`** — требуется переменная `TELEGRAM_TOKEN` и опционально `WIKI_USER_AGENT`
 
 ⚠️ **В разработке:**
 - Дополнительные MCP‑интеграции
@@ -98,6 +100,7 @@ docker compose down
 Создайте файл `.env` в корне и укажите:
 ```env
 TELEGRAM_TOKEN=<ваш_telegram_bot_token>
+WIKI_USER_AGENT=<ваш_user_agent_для_wikipedia_api>
 ```
 
 Подробнее см. `README.md`.
