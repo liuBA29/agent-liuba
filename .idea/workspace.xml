@@ -5,11 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="8d88f89a-c38e-4db4-b505-5c7a363b78c2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/memory.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PROJECT_STRUCTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/PROJECT_STRUCTURE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/mcp/weather.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/mcp/weather.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/mcp/wiki.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/mcp/wiki.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/conversations/memory.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/conversations/memory.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/telegram_bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/telegram_bot.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
