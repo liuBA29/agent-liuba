@@ -13,26 +13,34 @@ agent-liuba/
 │   └── inspectionProfiles/
 │       └── profiles_settings.xml
 ├── .venv/                        # Виртуальное окружение Python
+├── Dockerfile                    # Образ приложения (python:3.11-slim)
+├── docker-compose.yml            # Сервис бота, монтирование папок и .env
+├── README.md                     # Краткая документация: установка, запуск, команды
+├── requirements.txt              # Список зависимостей проекта
 ├── conversations/                # Папка для сохранения диалогов
 ├── data/                         # Данные и файлы базы знаний
 ├── src/                          # Исходный код
 │   ├── main.py                   # Главный файл запуска
-│   ├── telegram_bot.py           # Telegram бот (частично реализован)
-│   └── mcp/                      # MCP (Model Context Protocol) серверы
+│   ├── telegram_bot.py           # Telegram-бот с командами /help, /health, /weather
+│   └── mcp/                      # MCP (Model Context Protocol) утилиты/интеграции
+│       └── weather.py            # Получение погоды через Open-Meteo (геокодинг + текущая температура)
 └── PROJECT_STRUCTURE.md          # Этот файл со структурой проекта
 ```
 
 ## Описание файлов и папок
 
 ### Основные файлы
-- **`main.py`** - точка входа в приложение, запускает Telegram бота
-- **`telegram_bot.py`** - реализация Telegram бота с командами /help и /health
-- **`.env`** - файл с переменными окружения (токен Telegram бота)
+- **`main.py`** — точка входа в приложение, запускает Telegram‑бота
+- **`telegram_bot.py`** — реализация Telegram‑бота с командами `/help`, `/health`, `/weather`
+- **`mcp/weather.py`** — модуль погоды: геокодирование города и запрос текущей температуры через Open‑Meteо
+- **`.env`** — файл с переменными окружения (как минимум `TELEGRAM_TOKEN`)
+- **`requirements.txt`** — список зависимостей проекта
+- **`README.md`** — установка, настройка, запуск, команды и краткая справка
 
 ### Папки данных
 - **`conversations/`** - для сохранения истории диалогов с пользователями
 - **`data/`** - для хранения данных, векторной базы знаний, файлов
-- **`src/mcp/`** - для MCP серверов (пока пустая)
+- **`src/mcp/`** - утилиты/интеграции (содержит `weather.py`)
 
 ### Системные файлы
 - **`.git/`** - Git репозиторий
@@ -41,17 +49,19 @@ agent-liuba/
 
 ## Текущий статус
 
-✅ **Установлены зависимости:**
-- `python-dotenv` - для работы с .env файлами
-- `python-telegram-bot` - для Telegram API
+✅ **Основные зависимости установлены:**
+- `python-telegram-bot>=20.0` — работа с Telegram API
+- `python-dotenv` — загрузка переменных окружения из `.env`
+- `requests` — HTTP‑запросы (используется модулем погоды)
 
-✅ **Создан .env файл** с токеном бота
+ℹ️ **На будущее (пока не используется в коде):**
+- `chromadb`, `sentence-transformers` — для векторной БД и эмбеддингов
+
+✅ **Файл `.env`** — требуется переменная `TELEGRAM_TOKEN`
 
 ⚠️ **В разработке:**
-- Telegram бот (базовая структура готова)
-- MCP интеграции
-- Векторная база данных
-- Система сохранения диалогов
+- Дополнительные MCP‑интеграции
+- Векторная база данных и сохранение диалогов
 
 ## Команды для запуска
 
@@ -62,3 +72,32 @@ python src/main.py
 # Запуск только Telegram бота
 python src/telegram_bot.py
 ```
+
+## Docker
+```bash
+# Сборка образа
+docker build -t agent-liuba .
+
+# Запуск контейнера с .env
+docker run --rm --name agent-liuba-bot --env-file .env agent-liuba
+```
+
+## Docker Compose
+```bash
+# Старт в фоне
+docker compose up -d
+
+# Просмотр логов
+docker compose logs -f
+
+# Остановка
+docker compose down
+```
+
+## Переменные окружения
+Создайте файл `.env` в корне и укажите:
+```env
+TELEGRAM_TOKEN=<ваш_telegram_bot_token>
+```
+
+Подробнее см. `README.md`.
