@@ -20,6 +20,7 @@ agent-liuba/
 ├── conversations/                # Папка для сохранения диалогов
 ├── data/                         # Данные и файлы базы знаний
 ├── src/                          # Исходный код
+|   ├── memory.py                   # 
 │   ├── main.py                   # Главный файл запуска
 │   ├── telegram_bot.py           # Telegram-бот с командами /help, /health, /weather
 │   └── mcp/                      # MCP (Model Context Protocol) утилиты/интеграции
@@ -70,6 +71,8 @@ agent-liuba/
 ```bash
 # Запуск основного приложения
 python src/main.py
+
+#добавить инфу про memory.py
 
 # Запуск только Telegram бота
 python src/telegram_bot.py
