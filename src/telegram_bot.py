@@ -1,232 +1,224 @@
-import os
-import sys
-import signal
+# telegram_bot.py
+import asyncio
 import json
-from datetime import datetime
+import os
+import signal
+import sys
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
-import openai
-import requests
-
-# ------------------ Настройка путей ------------------
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+# Добавляем путь к модулям
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-
 from mcp.weather import get_weather
 from mcp.wiki import get_wiki_summary
 from mcp.github import search_github
+from knowledge_base import add_fact, search_fact
 
-# ------------------ Загрузка токенов ------------------
-load_dotenv()
+
+
+load_dotenv()  # загружает переменные из .env если он есть
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
-    raise RuntimeError("Нужны TELEGRAM_TOKEN и OPENAI_API_KEY в .env")
+if not TELEGRAM_TOKEN:
+    raise RuntimeError("TELEGRAM_TOKEN не найден. Создайте .env с TELEGRAM_TOKEN")
 
-openai.api_key = OPENAI_API_KEY
-
-# ------------------ Глобальные переменные ------------------
+# Глобальная переменная для приложения
 app = None
-MEMORY_DIR = "conversations"
-os.makedirs(MEMORY_DIR, exist_ok=True)
 
-# ------------------ Обработка сигналов ------------------
 def signal_handler(signum, frame):
+    """Обработчик сигнала для корректной остановки бота"""
     print("\nПолучен сигнал остановки. Завершаем работу...")
     if app:
         app.stop()
     sys.exit(0)
 
+# Регистрируем обработчик сигнала
 signal.signal(signal.SIGINT, signal_handler)
 
-# ------------------ Работа с памятью ------------------
-def get_memory_file(user_id):
-    """Создаёт уникальный файл для каждой новой сессии"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join(MEMORY_DIR, f"{user_id}_{timestamp}.json")
-
-def load_memory(file_path):
-    if not os.path.exists(file_path):
-        return []
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_memory(file_path, memory):
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
-
-def append_message(file_path, role, text):
-    memory = load_memory(file_path)
-    memory.append({
-        "role": role,
-        "text": text,
-        "time": datetime.now().isoformat(timespec="seconds")
-    })
-    memory = memory[-50:]  # хранить только последние 50 сообщений
-    save_memory(file_path, memory)
-
-def get_context(file_path):
-    return load_memory(file_path)
-
-# ------------------ Команды ------------------
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
     text = (
         "Привет! Я Помощник Любы 😊\n\n"
         "Команды:\n"
         "/help - показать это сообщение\n"
         "/health - показать статус агента\n"
-        "/weather <город> - узнать погоду\n"
-        "/wiki <тема> - найти информацию в Википедии\n"
+        "/weather <город> - узнать погоду в городе\n"
+        "/wiki <тема> - найти информацию в Википедии\n\n"
         "/github <запрос> - поиск репозиториев на GitHub\n\n"
-        "Просто напиши что-нибудь — и я отвечу 🌸"
+        "Просто напиши что-нибудь — и я отвечу."
     )
     await update.message.reply_text(text)
 
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
     status = {
         "telegram": "ok",
-        "mcp1": "connected",
-        "vector_db": "not_initialized",
-        "memory_dir": MEMORY_DIR,
+        "github": "ok",
+        "weather": "ok",
+        "wiki": "ok",
     }
     pretty = "\n".join(f"{k}: {v}" for k, v in status.items())
     await update.message.reply_text(f"Health status:\n{pretty}")
 
+
+
 async def weather_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
     if not context.args:
         await update.message.reply_text("Напиши название города, например: /weather Минск")
         return
 
     city = " ".join(context.args)
     report = get_weather(city)
-
-    user_id = update.message.from_user.id
-    file_path = get_memory_file(user_id)
-    append_message(file_path, "user", f"/weather {city}")
-    append_message(file_path, "bot", report)
-
     await update.message.reply_text(report)
 
+
 async def wiki_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
+    """Поиск краткого описания в Википедии"""
     if not context.args:
         await update.message.reply_text("Напиши тему, например: /wiki Минск")
         return
 
     query = " ".join(context.args)
     result = get_wiki_summary(query)
-
-    user_id = update.message.from_user.id
-    file_path = get_memory_file(user_id)
-    append_message(file_path, "user", f"/wiki {query}")
-    append_message(file_path, "bot", result)
-
     await update.message.reply_text(result)
 
+
+
 async def github_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
+    """Асинхронный обработчик GitHub-команды"""
     if not context.args:
         await update.message.reply_text("Напиши запрос, например: /github telegram bot")
         return
 
     query = " ".join(context.args)
-    result = search_github(query)
+    await update.message.reply_text("🔎 Ищу репозитории на GitHub...")
 
-    user_id = update.message.from_user.id
-    file_path = get_memory_file(user_id)
-    append_message(file_path, "user", f"/github {query}")
-    append_message(file_path, "bot", result)
-
+    # Выполняем блокирующий HTTP-запрос в отдельном потоке, чтобы не блокировать event loop
+    result = await asyncio.to_thread(search_github, query)
     await update.message.reply_text(result)
 
-# ------------------ Универсальный чат ------------------
-async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Напиши запрос, например: /search Python asyncio")
         return
+    query = " ".join(context.args)
+    results = search_fact(query)
+    if results:
+        text = "🔎 Нашлось в базе:\n" + "\n".join(results)
+    else:
+        text = "Ничего не нашлось."
+    await update.message.reply_text(text)
 
-    user_text = update.message.text.strip()
-    user_text_lower = user_text.lower()
-    user_id = update.message.from_user.id
-    file_path = get_memory_file(user_id)
+# Файл для простой персистентной памяти
+MEMORY_FILE = "memory.json"
+MAX_HISTORY_PER_USER = 200  # мягкий лимит на длину истории одного пользователя
 
-    append_message(file_path, "user", user_text)
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-    # --- Простые живые ответы ---
-    greetings = ["hi", "hello", "привет", "здравствуй", "добрый день"]
-    farewells = ["bye", "пока", "до свидания", "увидимся"]
+def save_memory():
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, ensure_ascii=False, indent=2)
 
-    if user_text_lower in greetings:
-        bot_reply = "Привет! 😊 Как настроение сегодня?"
-        append_message(file_path, "bot", bot_reply)
-        await update.message.reply_text(bot_reply)
-        return
-    elif user_text_lower in farewells:
-        bot_reply = "Пока! 🌸 Будет приятно снова с тобой пообщаться."
-        append_message(file_path, "bot", bot_reply)
-        await update.message.reply_text(bot_reply)
-        return
+# Простая память в виде словаря: user_id -> список сообщений (загружаем при старте)
+memory = load_memory()
 
-    # --- Ответ через OpenAI без ссылок ---
-    context_messages = get_context(file_path)
-    messages = [
-        {"role": "system", "content": (
-            "Ты дружелюбный помощник Любы. "
-            "Отвечай на вопросы только текстом, "
-            "никогда не вставляй ссылки на GitHub или любые внешние сайты."
-        )},
-    ] + [
-        {"role": "user", "content": msg["text"]} if msg["role"] == "user" else
-        {"role": "assistant", "content": msg["text"]}
-        for msg in context_messages
-    ]
+def get_user_history(user_id: str, limit: int | None = None):
+    history = memory.get(user_id, [])
+    if limit is not None and limit > 0:
+        return history[-limit:]
+    return history
 
+def append_user_entry(user_id: str, role: str, text: str):
+    # Добавляем запись и придерживаемся мягкого лимита истории
+    memory.setdefault(user_id, []).append({"role": role, "text": text})
+    if len(memory[user_id]) > MAX_HISTORY_PER_USER:
+        memory[user_id] = memory[user_id][-MAX_HISTORY_PER_USER:]
+    save_memory()
+
+def clear_user_history(user_id: str):
+    memory[user_id] = []
+    save_memory()
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    text = update.message.text.strip()
+
+    # Добавляем сообщение пользователя в память
+    append_user_entry(user_id, "user", text)
+
+    # Примитивные ответы на ключевые фразы
+    if "привет" in text.lower():
+        reply = "Привет, рада тебя видеть! 😊"
+    elif "как дела" in text.lower():
+        reply = "У меня всё отлично, работаю как часы 🤖"
+    elif "спасибо" in text.lower():
+        reply = "Всегда пожалуйста 🌸"
+    elif "что ты помнишь" in text.lower():
+        past = [m['text'] for m in memory[user_id][-3:]]  # последние 3 сообщения
+        reply = "Я помню, что мы недавно говорили о:\n" + "\n".join(past)
+    else:
+        reply = "Я пока не всё понимаю, но стараюсь учиться с каждым сообщением 💫"
+
+    # Сохраняем ответ бота тоже
+    append_user_entry(user_id, "bot", reply)
+
+    await update.message.reply_text(reply)
+
+async def context_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать последние N сообщений контекста для текущего пользователя."""
+    user_id = str(update.effective_user.id)
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=250
-        )
-        bot_reply = response.choices[0].message.content.strip()
-    except Exception as e:
-        bot_reply = f"Ошибка при обращении к ChatGPT: {e}"
+        limit = int(context.args[0]) if context.args else 10
+    except Exception:
+        limit = 10
+    limit = max(1, min(limit, 50))
 
-    append_message(file_path, "bot", bot_reply)
-    await update.message.reply_text(bot_reply)
+    history = get_user_history(user_id, limit)
+    if not history:
+        await update.message.reply_text("Контекст пуст.")
+        return
 
-# ------------------ Запуск бота ------------------
+    lines = []
+    for entry in history:
+        prefix = "user:" if entry.get("role") == "user" else "bot:"
+        lines.append(f"{prefix} {entry.get('text','')}")
+    await update.message.reply_text("\n".join(lines))
+
+async def forget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Очистить историю диалога текущего пользователя."""
+    user_id = str(update.effective_user.id)
+    clear_user_history(user_id)
+    await update.message.reply_text("Я забыла наш предыдущий разговор для этой сессии.")
+
+
 def run_bot():
     global app
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Команды
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("health", health_command))
     app.add_handler(CommandHandler("weather", weather_command))
     app.add_handler(CommandHandler("wiki", wiki_command))
     app.add_handler(CommandHandler("github", github_command))
+    app.add_handler(CommandHandler("context", context_command))
+    app.add_handler(CommandHandler("forget", forget_command))
+    app.add_handler(CommandHandler("search", search_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Чат
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
+    # Пример: добавим пару фактов при запуске (можно убрать или заменить)
+    try:
+        add_fact("Python — это язык программирования, созданный Гвидо ван Россумом.")
+        add_fact("Асинхронность в Python реализуется через asyncio и await.")
+    except Exception:
+        # Если embedding-модель ещё скачивается или нет доступа в интернет,
+        # запуск бота не должен падать
+        pass
+
 
     print("Бот запускается. Нажмите Ctrl+C для остановки.")
+    
     try:
         app.run_polling()
     except KeyboardInterrupt:
@@ -237,5 +229,3 @@ def run_bot():
         if app:
             app.stop()
 
-if __name__ == "__main__":
-    run_bot()
