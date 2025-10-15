@@ -53,7 +53,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<code>/search &lt;запрос&gt;</code> — поиск по базе знаний\n"
         "<code>/chat &lt;текст&gt;</code> — свободный диалог с ИИ (OpenRouter)\n"
         "<code>/remember &lt;факт&gt;</code> — сохранить факт в базу знаний\n"
-        "/context [N] — показать последние N сообщений диалога\n"
+        "/context 10 — показать последние 10 сообщений диалога\n"
         "/forget — забыть историю диалога\n\n"
         "Просто напиши что-нибудь — и я отвечу."
     )
@@ -297,7 +297,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply)
 
 async def context_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать последние N сообщений контекста для текущего пользователя."""
+    """Показать последние 10 сообщений контекста (можно указать 1–50)."""
     user_id = str(update.effective_user.id)
     try:
         limit = int(context.args[0]) if context.args else 10

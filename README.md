@@ -19,7 +19,7 @@ Agent Liuba
 
 /chat <текст>: свободный диалог с ИИ (OpenRouter)
 
-/context [N]: показать последние N сообщений диалога (по умолчанию 10)
+/context 10: показать последние 10 сообщений диалога
 
 /forget: очистить историю текущего пользователя
 
@@ -83,7 +83,7 @@ python src/telegram_bot.py
 
 /search <запрос> — поиск по локальной базе знаний
 
-/context [N] — показать недавний контекст диалога
+/context 10 — показать недавний контекст диалога
 
 /forget — забыть историю пользователя
 
@@ -143,3 +143,41 @@ docker compose down
 Лицензия
 
 Добавьте при необходимости файл LICENSE и укажите тип лицензии.
+
+Пример .env
+
+Создайте файл `.env` в корне проекта (можно скопировать из примера):
+
+```bash
+cp .env.example .env
+```
+
+Содержимое `.env.example`:
+
+```env
+TELEGRAM_TOKEN=
+WIKI_USER_AGENT=PomoshnikLiubyBot/1.0 (docs-example)
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openrouter/auto
+# Optional: adjust logging, timeouts, etc.
+# LOG_LEVEL=INFO
+```
+
+Скриншоты
+
+Положите изображения скриншотов переписки в каталог `screenshots/` в корне проекта. Каталог можно создать вручную, файлы попадут в репозиторий, если в нём есть хотя бы один файл (например, `.gitkeep`).
+
+Скриншоты
+
+Создайте каталог `screenshots/` и складывайте туда снимки диалогов с ботом. В репозитории можно держать пустую директорию с помощью файла-плейсхолдера `.gitkeep`.
+
+Пример `.env`
+
+Создайте файл `.env` по образцу ниже (или используйте `.env.example`, если он есть):
+
+```
+TELEGRAM_TOKEN=...
+WIKI_USER_AGENT=YourAppName/1.0 (contact@example.com)
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=openrouter/auto
+```
