@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+import requests
 # Добавляем путь к модулям
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from mcp.weather import get_weather
@@ -19,6 +20,9 @@ from knowledge_base import add_fact, search_fact
 
 load_dotenv()  # загружает переменные из .env если он есть
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/auto")
+WIKI_USER_AGENT = os.getenv("WIKI_USER_AGENT", "PomoshnikLiubyBot/1.0 (health-check)")
 
 if not TELEGRAM_TOKEN:
     raise RuntimeError("TELEGRAM_TOKEN не найден. Создайте .env с TELEGRAM_TOKEN")
@@ -47,6 +51,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<code>/wiki &lt;тема&gt;</code> — найти информацию в Википедии\n"
         "/github &lt;запрос&gt; — поиск репозиториев на GitHub\n"
         "<code>/search &lt;запрос&gt;</code> — поиск по базе знаний\n"
+        "<code>/chat &lt;текст&gt;</code> — свободный диалог с ИИ (OpenRouter)\n"
         "<code>/remember &lt;факт&gt;</code> — сохранить факт в базу знаний\n"
         "/context [N] — показать последние N сообщений диалога\n"
         "/forget — забыть историю диалога\n\n"
@@ -59,11 +64,66 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await help_command(update, context)
 
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def check_github():
+        try:
+            def _req():
+                return requests.get("https://api.github.com/rate_limit", timeout=5)
+            r = await asyncio.to_thread(_req)
+            return "ok" if r.status_code == 200 else f"error {r.status_code}"
+        except Exception as e:
+            return f"error: {e}" 
+
+    async def check_wiki():
+        try:
+            headers = {"User-Agent": WIKI_USER_AGENT}
+            def _req():
+                return requests.get("https://ru.wikipedia.org/api/rest_v1/page/summary/Минск", headers=headers, timeout=5)
+            r = await asyncio.to_thread(_req)
+            return "ok" if r.status_code == 200 else f"error {r.status_code}"
+        except Exception as e:
+            return f"error: {e}"
+
+    async def check_weather():
+        try:
+            def _req():
+                return requests.get("https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current_weather=true", timeout=5)
+            r = await asyncio.to_thread(_req)
+            return "ok" if r.status_code == 200 else f"error {r.status_code}"
+        except Exception as e:
+            return f"error: {e}"
+
+    async def check_kb():
+        try:
+            # Пробуем выполнить быстрый запрос (может вернуть пусто, это нормально)
+            _ = await asyncio.to_thread(search_fact, "healthcheck",)
+            return "ok"
+        except Exception as e:
+            return f"error: {e}"
+
+    async def check_openrouter():
+        if not OPENROUTER_API_KEY:
+            return "not_configured"
+        try:
+            import requests
+            def _req():
+                # Пингуем минимальный запрос модели с пустым контентом, но не отправляем (только заголовки)
+                return requests.get("https://openrouter.ai/api/v1/models", timeout=5)
+            r = await asyncio.to_thread(_req)
+            return "ok" if r.status_code == 200 else f"error {r.status_code}"
+        except Exception as e:
+            return f"error: {e}"
+
+    github_s, wiki_s, weather_s, kb_s, openrouter_s = await asyncio.gather(
+        check_github(), check_wiki(), check_weather(), check_kb(), check_openrouter()
+    )
+
     status = {
         "telegram": "ok",
-        "github": "ok",
-        "weather": "ok",
-        "wiki": "ok",
+        "github": github_s,
+        "weather": weather_s,
+        "wiki": wiki_s,
+        "knowledge_base": kb_s,
+        "openrouter": openrouter_s,
     }
     pretty = "\n".join(f"{k}: {v}" for k, v in status.items())
     await update.message.reply_text(f"Health status:\n{pretty}")
@@ -117,6 +177,70 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = "Ничего не нашлось."
     await update.message.reply_text(text)
 
+async def _generate_chat_reply(user_id: str, user_text: str) -> str:
+    if not OPENROUTER_API_KEY:
+        return "[OpenRouter] Не настроен ключ. Добавьте OPENROUTER_API_KEY в .env"
+
+    history = get_user_history(user_id, limit=12)
+    messages = [{
+        "role": "system",
+        "content": (
+            "Ты Помощник Любы — дружелюбный, краткий и полезный ассистент. "
+            "Независимо от формулировки вопроса о твоей личности, всегда отвечай, что ты 'Помощник Любы'. "
+            "Не упоминай поставщика модели или технические детали. Отвечай по делу."
+        ),
+    }]
+    for h in history:
+        role = h.get("role")
+        content = h.get("text", "")
+        if role in ("user", "bot") and content:
+            messages.append({"role": "user" if role == "user" else "assistant", "content": content})
+    messages.append({"role": "user", "content": user_text})
+
+    try:
+        import requests
+        def _call_openrouter():
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/liuBA29/agent-liuba",
+                "X-Title": "Agent Liuba",
+            }
+            payload = {
+                "model": OPENROUTER_MODEL,
+                "messages": messages,
+                "temperature": 0.6,
+                "max_tokens": 400,
+            }
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
+            r.raise_for_status()
+            return r.json()
+
+        data = await asyncio.to_thread(_call_openrouter)
+        choice = (data.get("choices") or [{}])[0]
+        message = choice.get("message") or {}
+        reply_text = (message.get("content") or "").strip() or "[OpenRouter] Пустой ответ"
+    except Exception as e:
+        err_text = str(e)
+        if ("429" in err_text) or ("rate" in err_text.lower() and "limit" in err_text.lower()):
+            reply_text = "[OpenRouter] Превышен лимит или временная ошибка. Попробуйте позже."
+        else:
+            reply_text = f"[OpenRouter] Ошибка: {e}"
+    return reply_text
+
+async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Напиши текст, например: /chat Привет, как дела?")
+        return
+    user_id = str(update.effective_user.id)
+    user_text = " ".join(context.args)
+    await update.message.reply_text("✍️ Думаю над ответом...")
+    reply_text = await _generate_chat_reply(user_id, user_text)
+    append_user_entry(user_id, "user", user_text)
+    append_user_entry(user_id, "bot", reply_text)
+    await update.message.reply_text(reply_text)
+
 async def remember_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Напиши факт, например: /remember Python создан Гвидо ван Россумом")
@@ -165,36 +289,11 @@ def clear_user_history(user_id: str):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     text = update.message.text.strip()
-
-    # Добавляем сообщение пользователя в память
+    # Роутим любые не-командные сообщения через тот же движок, что и /chat
+    await update.message.reply_text("✍️ Думаю над ответом...")
+    reply = await _generate_chat_reply(user_id, text)
     append_user_entry(user_id, "user", text)
-
-    # Примитивные ответы на ключевые фразы
-    if "привет" in text.lower():
-        reply = "Привет, рада тебя видеть! 😊"
-    elif "как дела" in text.lower():
-        reply = "У меня всё отлично, работаю как часы 🤖"
-    elif "спасибо" in text.lower():
-        reply = "Всегда пожалуйста 🌸"
-    elif "что ты помнишь" in text.lower():
-        past = [m['text'] for m in memory[user_id][-3:]]  # последние 3 сообщения
-        reply = "Я помню, что мы недавно говорили о:\n" + "\n".join(past)
-    else:
-        # Попробуем подсказать из базы знаний
-        kb_hits = []
-        try:
-            kb_hits = search_fact(text) or []
-        except Exception:
-            kb_hits = []
-        if kb_hits:
-            top = kb_hits[:3]
-            reply = "Я пока не всё понимаю, но вот что нашла в базе:\n" + "\n".join(top)
-        else:
-            reply = "Я пока не всё понимаю, но стараюсь учиться с каждым сообщением 💫"
-
-    # Сохраняем ответ бота тоже
     append_user_entry(user_id, "bot", reply)
-
     await update.message.reply_text(reply)
 
 async def context_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,6 +333,7 @@ def run_bot():
     app.add_handler(CommandHandler("weather", weather_command))
     app.add_handler(CommandHandler("wiki", wiki_command))
     app.add_handler(CommandHandler("github", github_command))
+    app.add_handler(CommandHandler("chat", chat_command))
     app.add_handler(CommandHandler("remember", remember_command))
     app.add_handler(CommandHandler("context", context_command))
     app.add_handler(CommandHandler("forget", forget_command))

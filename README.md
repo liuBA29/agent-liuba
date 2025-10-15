@@ -17,6 +17,8 @@ Agent Liuba
 
 /search <запрос>: семантический поиск по локальной базе знаний (пример: /search кто создал python)
 
+/chat <текст>: свободный диалог с ИИ (OpenRouter)
+
 /context [N]: показать последние N сообщений диалога (по умолчанию 10)
 
 /forget: очистить историю текущего пользователя
@@ -33,6 +35,7 @@ Wikipedia	Краткие описания и справка по темам	Wiki
 GitHub	Поиск публичных репозиториев по ключевым словам	GitHub REST API v3
 
 Knowledge Base	Семантический поиск по локальной базе фактов	ChromaDB + SentenceTransformers
+Chat (/chat)	Свободный диалог с моделью	OpenRouter API
 Требования
 
 Python 3.10+
@@ -52,6 +55,8 @@ pip install -r requirements.txt
 
 TELEGRAM_TOKEN=<ваш_telegram_bot_token>
 WIKI_USER_AGENT=<ваш_user_agent_для_wikipedia_api>
+OPENROUTER_API_KEY=<ваш_openrouter_api_key>
+OPENROUTER_MODEL=openrouter/auto
 
 Запуск
 # Запуск основного приложения
