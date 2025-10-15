@@ -14,6 +14,7 @@ services:
       - ./src:/app/src:ro
       - ./conversations:/app/conversations
       - ./data:/app/data
+      - ~/.cache/huggingface:/root/.cache/huggingface  # кэш моделей sentence-transformers
     networks:
       - agent_net
 

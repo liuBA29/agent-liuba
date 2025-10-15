@@ -17,62 +17,55 @@ agent-liuba/
 ├── docker-compose.yml            # Сервис бота, монтирование папок и .env
 ├── README.md                     # Краткая документация: установка, запуск, команды
 ├── requirements.txt              # Список зависимостей проекта
-├── conversations/                # Папка для сохранения диалогов
+├── conversations/                # Папка для сохранения диалогов (если используется)
 ├── data/                         # Данные и файлы базы знаний
 ├── src/                          # Исходный код
-|   ├── memory.py                   # 
+│   ├── knowledge_base.py         # Локальная база знаний (ChromaDB + SentenceTransformers)
 │   ├── main.py                   # Главный файл запуска
-│   ├── telegram_bot.py           # Telegram-бот с командами /help, /health, /weather
-│   └── mcp/                      # MCP (Model Context Protocol) утилиты/интеграции
-│       ├── weather.py            # Получение погоды через Open-Meteo (геокодинг + текущая температура)
-│       └── wiki.py               # Поиск информации в Википедии через Wikipedia REST API
+│   ├── telegram_bot.py           # Бот: /help, /health, /weather, /wiki, /github, /search, /context, /forget
+│   └── mcp/                      # Интеграции (MCP-like утилиты)
+│       ├── weather.py            # Погода через Open‑Метео (геокодинг + температура)
+│       ├── wiki.py               # Краткие описания из Wikipedia REST API
+│       └── github.py             # Поиск публичных репозиториев GitHub
 └── PROJECT_STRUCTURE.md          # Этот файл со структурой проекта
 ```
 
 ## Описание файлов и папок
 
 ### Основные файлы
-- **`main.py`** — точка входа в приложение, запускает Telegram‑бота
-- **`telegram_bot.py`** — реализация Telegram‑бота с командами `/help`, `/health`, `/weather`, `/wiki`
-- **`mcp/weather.py`** — модуль погоды: геокодирование города и запрос текущей температуры через Open‑Meteо
-- **`mcp/wiki.py`** — модуль Википедии: поиск краткого описания статей через Wikipedia REST API
-- **`.env`** — файл с переменными окружения (`TELEGRAM_TOKEN`, `WIKI_USER_AGENT`)
-- **`requirements.txt`** — список зависимостей проекта
-- **`README.md`** — установка, настройка, запуск, команды и краткая справка
+- `main.py` — точка входа в приложение, запускает Telegram‑бота
+- `telegram_bot.py` — реализация Telegram‑бота с командами `/help`, `/health`, `/weather`, `/wiki`, `/github`, `/search`, `/context`, `/forget`
+- `knowledge_base.py` — локальная база знаний (добавление фактов и семантический поиск)
+- `mcp/weather.py` — модуль погоды: геокодирование города и запрос текущей температуры через Open‑Метео
+- `mcp/wiki.py` — модуль Википедии: поиск краткого описания статей через Wikipedia REST API
+- `mcp/github.py` — поиск публичных репозиториев GitHub
+- `.env` — файл с переменными окружения (`TELEGRAM_TOKEN`, `WIKI_USER_AGENT`)
+- `requirements.txt` — список зависимостей проекта
+- `README.md` — установка, настройка, запуск, команды и краткая справка
 
 ### Папки данных
-- **`conversations/`** - для сохранения истории диалогов с пользователями
-- **`data/`** - для хранения данных, векторной базы знаний, файлов
-- **`src/mcp/`** - утилиты/интеграции (содержит `weather.py`, `wiki.py`)
+- `conversations/` — для сохранения истории диалогов (если используется)
+- `data/` — для хранения данных, векторной базы знаний, файлов
+- `src/mcp/` — утилиты/интеграции (`weather.py`, `wiki.py`, `github.py`)
 
 ### Системные файлы
-- **`.git/`** - Git репозиторий
-- **`.idea/`** - настройки IDE PyCharm
-- **`.venv/`** - виртуальное окружение Python
+- `.git/` — Git репозиторий
+- `.idea/` — настройки IDE PyCharm
+- `.venv/` — виртуальное окружение Python
 
-## Текущий статус
-
-✅ **Основные зависимости установлены:**
+## Зависимости
 - `python-telegram-bot>=20.0` — работа с Telegram API
 - `python-dotenv` — загрузка переменных окружения из `.env`
-- `requests` — HTTP‑запросы (используется модулем погоды)
-
-ℹ️ **На будущее (пока не используется в коде):**
-- `chromadb`, `sentence-transformers` — для векторной БД и эмбеддингов
-
-✅ **Файл `.env`** — требуется переменная `TELEGRAM_TOKEN` и опционально `WIKI_USER_AGENT`
-
-⚠️ **В разработке:**
-- Дополнительные MCP‑интеграции
-- Векторная база данных и сохранение диалогов
+- `requests` — HTTP‑запросы
+- `chromadb` — векторная база
+- `sentence-transformers` — эмбеддинги для поиска
 
 ## Команды для запуска
-
 ```bash
 # Запуск основного приложения
 python src/main.py
 
-#добавить инфу про memory.py
+# Память диалога сохраняется в файле memory.json. Команды: /context, /forget
 
 # Запуск только Telegram бота
 python src/telegram_bot.py
