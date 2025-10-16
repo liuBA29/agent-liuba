@@ -2,19 +2,29 @@ version: "3.9"
 
 services:
   bot:
-    build: .
+    build:
+      context: .
+      args:
+        # Set to "true" when you want embeddings/KB locally; keep "false" on low-RAM servers
+        WITH_EMBEDDINGS: ${WITH_EMBEDDINGS-false}
     container_name: agent-liuba-bot
     env_file:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      - WITH_EMBEDDINGS=${WITH_EMBEDDINGS-false}
     command: ["python", "src/main.py"]
     restart: unless-stopped
     volumes:
       - ./src:/app/src:ro
       - ./conversations:/app/conversations
       - ./data:/app/data
-      - ~/.cache/huggingface:/root/.cache/huggingface  # кэш моделей sentence-transformers
+      # Mount model cache only if embeddings are enabled
+      - type: bind
+        source: ${HUGGINGFACE_HOME-~/.cache/huggingface}
+        target: /root/.cache/huggingface
+        bind:
+          create_host_path: true
     networks:
       - agent_net
 

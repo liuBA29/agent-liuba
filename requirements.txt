@@ -1,6 +1,5 @@
-python-telegram-bot>=20.0
-python-dotenv
-requests
-chromadb
-sentence-transformers
-openai>=1.0.0; python_version<'3.12'  # опционально, можно удалить при полном переходе
+python-telegram-bot==20.7
+python-dotenv>=1.0.0
+requests>=2.31.0
+# Heavy deps moved to requirements-embeddings.txt; this base stays light
+openai>=1.0.0; python_version<'3.12'  # опционально

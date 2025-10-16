@@ -1,0 +1,4 @@
+# Separate heavy ML/vector deps; install only when needed
+chromadb>=0.5.5
+sentence-transformers>=2.2.2
+

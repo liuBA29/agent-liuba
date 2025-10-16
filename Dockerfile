@@ -1,25 +1,39 @@
 FROM python:3.11-slim
 
-# System deps (optional but handy: curl for debugging, build deps for some wheels)
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Minimal system deps
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+       ca-certificates \
        curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install python deps first (leverage layer caching)
+# Optional heavy deps toggle (OFF by default)
+ARG WITH_EMBEDDINGS=false
+ENV WITH_EMBEDDINGS=${WITH_EMBEDDINGS}
+
+# Install python deps with cache-friendly layering
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
+
+# Install heavy ML deps only when requested
+COPY requirements-embeddings.txt ./
+RUN if [ "$WITH_EMBEDDINGS" = "true" ]; then \
+      pip install -r requirements-embeddings.txt; \
+    else \
+      echo "Skipping embeddings deps"; \
+    fi
 
 # Copy source
 COPY src ./src
 
-# Default envs (can be overridden by docker-compose or -e)
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-# Run the bot
+# Default run
 CMD ["python", "src/main.py"]
 
 

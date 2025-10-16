@@ -1,32 +1,44 @@
-import chromadb
-from sentence_transformers import SentenceTransformer
+import os
 import hashlib
 
-# создаем persistent-клиент и коллекцию в папке data/chroma
-client = chromadb.PersistentClient(path="data/chroma")
-collection = client.get_or_create_collection("liuba_knowledge")
+# Lazy optional imports to support low-memory deployments without embeddings
+_WITH_EMBEDDINGS = os.getenv("WITH_EMBEDDINGS", "false").lower() == "true"
+_chroma_client = None
+_collection = None
+_model = None
 
-# модель для преобразования текста в векторы
-model = SentenceTransformer("all-MiniLM-L6-v2")
+def _ensure_embeddings_stack_loaded():
+    global _chroma_client, _collection, _model
+    if not _WITH_EMBEDDINGS:
+        raise RuntimeError("Embeddings stack disabled. Set WITH_EMBEDDINGS=true to enable KB.")
+    if _chroma_client is None:
+        import chromadb  # heavy
+        _chroma_client = chromadb.PersistentClient(path="data/chroma")
+        _collection = _chroma_client.get_or_create_collection("liuba_knowledge")
+    if _model is None:
+        from sentence_transformers import SentenceTransformer  # heavy
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def _make_id(fact: str) -> str:
     # Детерминированный ID по содержимому факта, чтобы избежать конфликтов и дубликатов
     return hashlib.sha1(fact.encode("utf-8")).hexdigest()
 
 def add_fact(fact: str):
-    """Добавить текстовый факт в базу знаний (id по содержимому, upsert)."""
-    embedding = model.encode([fact]).tolist()
+    """Добавить факт. Ничего не делает, если WITH_EMBEDDINGS=false."""
+    if not _WITH_EMBEDDINGS:
+        return
+    _ensure_embeddings_stack_loaded()
+    embedding = _model.encode([fact]).tolist()
     fid = _make_id(fact)
-    # upsert не упадёт, если такой id уже существует
-    collection.upsert(documents=[fact], embeddings=embedding, ids=[fid])
+    _collection.upsert(documents=[fact], embeddings=embedding, ids=[fid])
 
 def search_fact(query: str, top_k: int = 5, max_distance: float = 0.4):
-    """Поиск по смыслу. Возвращает уникальные релевантные документы (строки).
-
-    max_distance — порог косинусной дистанции (чем меньше, тем ближе). 0.4 ~ умеренно релевантно.
-    """
-    query_emb = model.encode([query]).tolist()
-    results = collection.query(
+    """Семантический поиск. Возвращает [] если WITH_EMBEDDINGS=false."""
+    if not _WITH_EMBEDDINGS:
+        return []
+    _ensure_embeddings_stack_loaded()
+    query_emb = _model.encode([query]).tolist()
+    results = _collection.query(
         query_embeddings=query_emb,
         n_results=top_k,
         include=["documents", "distances"],
@@ -40,7 +52,6 @@ def search_fact(query: str, top_k: int = 5, max_distance: float = 0.4):
     docs = docs_batches[0]
     dists = dist_batches[0] if dist_batches else [None] * len(docs)
 
-    # Фильтрация по порогу дистанции и удаление дублей, сохранение порядка
     seen = set()
     filtered: list[str] = []
     for doc, dist in zip(docs, dists):
