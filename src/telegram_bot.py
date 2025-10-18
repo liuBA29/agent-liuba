@@ -50,7 +50,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/health — показать статус агента\n"
         "<code>/weather &lt;город&gt;</code> — узнать погоду в городе\n"
         "<code>/wiki &lt;тема&gt;</code> — найти информацию в Википедии\n"
-        "/github &lt;запрос&gt; — поиск репозиториев на GitHub\n"
+        "<code>/github &lt;запрос&gt;</code> — поиск репозиториев на GitHub\n"
         "<code>/search &lt;запрос&gt;</code> — поиск по базе знаний\n"
         "<code>/chat &lt;текст&gt;</code> — свободный диалог с ИИ (OpenRouter)\n"
         "<code>/remember &lt;факт&gt;</code> — сохранить факт в базу знаний\n"
